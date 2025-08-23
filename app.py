@@ -351,7 +351,7 @@ def generate_invoices():
             flash('Aucun fichier sélectionné', 'error')
             return redirect(url_for('index'))
         
-        if not file or not allowed_file(file.filename):
+        if not file or not file.filename or not allowed_file(file.filename):
             flash('Type de fichier non autorisé. Veuillez utiliser un fichier Excel (.xlsx ou .xls)', 'error')
             return redirect(url_for('index'))
         
