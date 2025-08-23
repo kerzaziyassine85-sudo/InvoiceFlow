@@ -198,50 +198,88 @@ def generer_factures_pdf(fichier_excel, factures_par_page=1, fixed_invoice_numbe
             pos_x = (i % factures_par_ligne) * largeur_facture
             pos_y = hauteur - ((i // factures_par_ligne) % factures_par_col + 1) * hauteur_facture
 
+            # Adjust font sizes and spacing based on number of invoices per page
+            if factures_par_page == 4:
+                header_font_size = 7
+                normal_font_size = 6
+                title_font_size = 8
+                line_spacing = 8
+                section_spacing = 15
+                table_height = 40
+                margin = 5
+            else:
+                header_font_size = 10
+                normal_font_size = 9
+                title_font_size = 12
+                line_spacing = 15
+                section_spacing = 35
+                table_height = 60
+                margin = 10
+
             # Draw invoice frame
-            c.rect(pos_x+10, pos_y+10, largeur_facture-20, hauteur_facture-20)
+            c.rect(pos_x+margin, pos_y+margin, largeur_facture-2*margin, hauteur_facture-2*margin)
             
             # Client header (top line)
-            y_pos = pos_y + hauteur_facture - 30
-            c.setFont("Helvetica", 10)
-            c.drawString(pos_x+20, y_pos, f"NOM ET PRENOM:                 {row[name_col].upper()}                   PROFESSION: {client_profession}")
+            y_pos = pos_y + hauteur_facture - 20
+            c.setFont("Helvetica", header_font_size)
+            if factures_par_page == 4:
+                # Shorter text for compact layout
+                c.drawString(pos_x+margin+5, y_pos, f"NOM: {row[name_col].upper()[:15]}...")
+                y_pos -= line_spacing
+                c.drawString(pos_x+margin+5, y_pos, f"PROFESSION: {client_profession[:15]}")
+            else:
+                c.drawString(pos_x+20, y_pos, f"NOM ET PRENOM:                 {row[name_col].upper()}                   PROFESSION: {client_profession}")
             
             # Invoice number and month (centered)
-            y_pos -= 40
-            c.setFont("Helvetica-Bold", 12)
+            y_pos -= section_spacing
+            c.setFont("Helvetica-Bold", title_font_size)
             invoice_text = f"FACTURE N°:"
-            text_width = c.stringWidth(invoice_text, "Helvetica-Bold", 12)
+            text_width = c.stringWidth(invoice_text, "Helvetica-Bold", title_font_size)
             c.drawString(pos_x + (largeur_facture - text_width)/2, y_pos, invoice_text)
-            y_pos -= 15
-            text_width = c.stringWidth(invoice_display, "Helvetica-Bold", 12)
+            y_pos -= line_spacing
+            text_width = c.stringWidth(invoice_display, "Helvetica-Bold", title_font_size)
             c.drawString(pos_x + (largeur_facture - text_width)/2, y_pos, invoice_display)
-            y_pos -= 15
-            c.setFont("Helvetica", 10)
+            y_pos -= line_spacing
+            c.setFont("Helvetica", normal_font_size)
             month_text = f"MOIS : {month_year}"
-            text_width = c.stringWidth(month_text, "Helvetica", 10)
+            text_width = c.stringWidth(month_text, "Helvetica", normal_font_size)
             c.drawString(pos_x + (largeur_facture - text_width)/2, y_pos, month_text)
             
             # Company details section
-            y_pos -= 35
-            c.setFont("Helvetica-Bold", 11)
-            c.drawString(pos_x+20, y_pos, f"DOIT : {company_name}")
-            y_pos -= 15
-            c.setFont("Helvetica", 9)
-            c.drawString(pos_x+20, y_pos, f"ADRESSE: {address}")
-            y_pos -= 12
-            c.drawString(pos_x+20, y_pos, f" RC:{rc_name}    NIF: {nif}            RIB : {rib}")
+            y_pos -= section_spacing
+            c.setFont("Helvetica-Bold", normal_font_size)
+            c.drawString(pos_x+margin+5, y_pos, f"DOIT : {company_name}")
+            y_pos -= line_spacing
+            c.setFont("Helvetica", normal_font_size-1)
+            if factures_par_page == 4:
+                # Split long address for compact layout
+                c.drawString(pos_x+margin+5, y_pos, f"ADRESSE: {address[:25]}")
+                y_pos -= line_spacing-2
+                c.drawString(pos_x+margin+5, y_pos, f"RC:{rc_name[:12]} NIF:{nif[:12]}")
+                y_pos -= line_spacing-2
+                c.drawString(pos_x+margin+5, y_pos, f"RIB:{rib[:15]}")
+            else:
+                c.drawString(pos_x+20, y_pos, f"ADRESSE: {address}")
+                y_pos -= 12
+                c.drawString(pos_x+20, y_pos, f" RC:{rc_name}    NIF: {nif}            RIB : {rib}")
             
             # Table with borders
-            y_pos -= 35
+            y_pos -= section_spacing
             table_start_y = y_pos
-            table_height = 60
             
-            # Table columns positions (removed avance column)
-            col1_x = pos_x + 20   # Désignation
-            col2_x = pos_x + 200  # Quantité/LITRE
-            col3_x = pos_x + 280  # P.U
-            col4_x = pos_x + 350  # Total
-            table_end_x = pos_x + largeur_facture - 30
+            # Adjust table columns positions based on layout
+            if factures_par_page == 4:
+                col1_x = pos_x + margin + 5   # Désignation
+                col2_x = pos_x + largeur_facture * 0.5  # Quantité/LITRE
+                col3_x = pos_x + largeur_facture * 0.7  # P.U
+                col4_x = pos_x + largeur_facture * 0.85  # Total
+                table_end_x = pos_x + largeur_facture - margin - 5
+            else:
+                col1_x = pos_x + 20   # Désignation
+                col2_x = pos_x + 200  # Quantité/LITRE
+                col3_x = pos_x + 280  # P.U
+                col4_x = pos_x + 350  # Total
+                table_end_x = pos_x + largeur_facture - 30
             
             # Draw table borders
             c.rect(col1_x, y_pos - table_height, table_end_x - col1_x, table_height)
@@ -250,37 +288,62 @@ def generer_factures_pdf(fichier_excel, factures_par_page=1, fixed_invoice_numbe
             c.line(col3_x, y_pos, col3_x, y_pos - table_height)
             c.line(col4_x, y_pos, col4_x, y_pos - table_height)
             # Horizontal line for header
-            c.line(col1_x, y_pos - 25, table_end_x, y_pos - 25)
+            header_line_y = y_pos - (table_height * 0.4)
+            c.line(col1_x, header_line_y, table_end_x, header_line_y)
             
             # Table header
-            c.setFont("Helvetica-Bold", 9)
-            c.drawString(col2_x + 5, y_pos - 10, "Quantité/LITR")
-            c.drawString(pos_x + 25, y_pos - 22, "Désignation")
-            c.drawString(col2_x + 25, y_pos - 22, "E")
-            c.drawString(col3_x + 10, y_pos - 22, "P.U")
-            c.drawString(col4_x + 15, y_pos - 22, "Total")
+            c.setFont("Helvetica-Bold", normal_font_size-1)
+            if factures_par_page == 4:
+                c.drawString(col1_x + 2, y_pos - 8, "Désign.")
+                c.drawString(col2_x + 2, y_pos - 8, "Qté")
+                c.drawString(col3_x + 2, y_pos - 8, "P.U")
+                c.drawString(col4_x + 2, y_pos - 8, "Total")
+            else:
+                c.drawString(col2_x + 5, y_pos - 10, "Quantité/LITR")
+                c.drawString(pos_x + 25, y_pos - 22, "Désignation")
+                c.drawString(col2_x + 25, y_pos - 22, "E")
+                c.drawString(col3_x + 10, y_pos - 22, "P.U")
+                c.drawString(col4_x + 15, y_pos - 22, "Total")
             
             # Table content
-            y_pos -= 40
-            c.setFont("Helvetica", 9)
+            if factures_par_page == 4:
+                y_pos -= table_height * 0.6
+            else:
+                y_pos -= 40
+            c.setFont("Helvetica", normal_font_size-1)
             quantity = float(row[quantity_col])
             total = quantity * unit_price
             
-            c.drawString(col1_x + 5, y_pos, item_name)
-            c.drawString(col2_x + 15, y_pos, str(int(quantity)))
-            c.drawString(col3_x + 10, y_pos, f"{unit_price:.2f}")
-            c.drawString(col4_x + 10, y_pos, f"{total:,.2f}")
+            if factures_par_page == 4:
+                # Compact layout for table content
+                c.drawString(col1_x + 2, y_pos, item_name[:8] + "..." if len(item_name) > 8 else item_name)
+                c.drawString(col2_x + 2, y_pos, str(int(quantity)))
+                c.drawString(col3_x + 2, y_pos, f"{unit_price:.0f}")
+                c.drawString(col4_x + 2, y_pos, f"{total:,.0f}")
+            else:
+                c.drawString(col1_x + 5, y_pos, item_name)
+                c.drawString(col2_x + 15, y_pos, str(int(quantity)))
+                c.drawString(col3_x + 10, y_pos, f"{unit_price:.2f}")
+                c.drawString(col4_x + 10, y_pos, f"{total:,.2f}")
             
             # Amount section
-            y_pos -= 35
-            c.setFont("Helvetica-Bold", 10)
-            c.drawString(col3_x, y_pos, f"Montant                        {total:,.2f}")
+            y_pos -= section_spacing
+            c.setFont("Helvetica-Bold", normal_font_size)
+            if factures_par_page == 4:
+                c.drawString(col1_x, y_pos, f"Montant: {total:,.0f}")
+            else:
+                c.drawString(col3_x, y_pos, f"Montant                        {total:,.2f}")
             
             # Amount in French words
-            y_pos -= 20
-            c.setFont("Helvetica", 8)
+            y_pos -= line_spacing
+            c.setFont("Helvetica", normal_font_size-2)
             amount_words = number_to_french_words(int(total))
-            c.drawString(pos_x + 20, y_pos, f"Arrêté la présente facture à la somme de : {amount_words} dinars")
+            if factures_par_page == 4:
+                # Truncate text for compact layout
+                words_text = f"Arrêté: {amount_words[:30]}... dinars"
+                c.drawString(pos_x + margin + 5, y_pos, words_text)
+            else:
+                c.drawString(pos_x + 20, y_pos, f"Arrêté la présente facture à la somme de : {amount_words} dinars")
 
             if (i+1) % factures_par_page == 0:
                 c.showPage()
