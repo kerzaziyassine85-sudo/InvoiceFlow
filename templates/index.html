@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+
+{% block title %}Générateur de Factures - Accueil{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title mb-0">
+                    <i class="fas fa-upload me-2"></i>
+                    Générer des Factures PDF
+                </h2>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('generate_invoices') }}" enctype="multipart/form-data">
+                    <!-- File Upload Section -->
+                    <div class="mb-4">
+                        <h5 class="text-primary">
+                            <i class="fas fa-file-excel me-2"></i>
+                            Fichier Excel
+                        </h5>
+                        <div class="mb-3">
+                            <label for="file" class="form-label">Sélectionner le fichier Excel (.xlsx ou .xls)</label>
+                            <input type="file" class="form-control" name="file" id="file" accept=".xlsx,.xls" required>
+                            <div class="form-text">
+                                Le fichier doit contenir les colonnes: Nom/Client, Quantité, Montant
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Invoice Settings Section -->
+                    <div class="mb-4">
+                        <h5 class="text-primary">
+                            <i class="fas fa-cog me-2"></i>
+                            Paramètres de Facture
+                        </h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="fixed_invoice_number" class="form-label">Numéro de Facture Fixe</label>
+                                    <input type="text" class="form-control" name="fixed_invoice_number" id="fixed_invoice_number" 
+                                           value="FAC-001" placeholder="FAC-001" required>
+                                    <div class="form-text">
+                                        Ce numéro sera utilisé pour toutes les factures générées
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="invoice_date" class="form-label">Date de Facture</label>
+                                    <input type="date" class="form-control" name="invoice_date" id="invoice_date" value="{{ today }}">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="month_year" class="form-label">Mois/Année</label>
+                                    <input type="text" class="form-control" name="month_year" id="month_year" 
+                                           placeholder="Janvier 2025" value="{{ settings.month_year if settings else '' }}">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="factures_par_page" class="form-label">Factures par page</label>
+                                    <select class="form-select" name="factures_par_page" id="factures_par_page">
+                                        <option value="1">1 facture par page</option>
+                                        <option value="2">2 factures par page</option>
+                                        <option value="4">4 factures par page</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Company Information Section -->
+                    <div class="mb-4">
+                        <h5 class="text-primary">
+                            <i class="fas fa-building me-2"></i>
+                            Informations de l'Entreprise
+                        </h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="company_name" class="form-label">Nom de l'entreprise</label>
+                                    <input type="text" class="form-control" name="company_name" id="company_name" 
+                                           value="{{ settings.company_name if settings else '' }}" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="address" class="form-label">Adresse</label>
+                                    <textarea class="form-control" name="address" id="address" rows="2">{{ settings.address if settings else '' }}</textarea>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="rc_name" class="form-label">RC</label>
+                                    <input type="text" class="form-control" name="rc_name" id="rc_name" 
+                                           value="{{ settings.rc_name if settings else '' }}">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="nif" class="form-label">NIF</label>
+                                    <input type="text" class="form-control" name="nif" id="nif" 
+                                           value="{{ settings.nif if settings else '' }}">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="rib" class="form-label">RIB</label>
+                                    <input type="text" class="form-control" name="rib" id="rib" 
+                                           value="{{ settings.rib if settings else '' }}">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Product Information Section -->
+                    <div class="mb-4">
+                        <h5 class="text-primary">
+                            <i class="fas fa-box me-2"></i>
+                            Informations Produit
+                        </h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="item_name" class="form-label">Nom du produit/service</label>
+                                    <input type="text" class="form-control" name="item_name" id="item_name" 
+                                           value="{{ settings.item_name if settings else '' }}" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="unit_price" class="form-label">Prix unitaire</label>
+                                    <input type="number" step="0.01" class="form-control" name="unit_price" id="unit_price" 
+                                           value="{{ settings.unit_price if settings else '0' }}" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="client_profession" class="form-label">Profession du client</label>
+                            <input type="text" class="form-control" name="client_profession" id="client_profession" 
+                                   value="{{ settings.client_profession if settings else '' }}">
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-file-pdf me-2"></i>
+                            Générer les Factures PDF
+                        </button>
+                        <button type="submit" formaction="{{ url_for('save_settings') }}" class="btn btn-secondary">
+                            <i class="fas fa-save me-2"></i>
+                            Sauvegarder les Paramètres
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Instructions Section -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Instructions
+                </h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled">
+                    <li><i class="fas fa-check text-success me-2"></i>Le fichier Excel doit contenir des colonnes pour les noms des clients, les quantités et les montants</li>
+                    <li><i class="fas fa-check text-success me-2"></i>Les noms de colonnes acceptés: 
+                        <ul class="mt-2">
+                            <li><strong>Noms:</strong> nom, nom prenom, client, name</li>
+                            <li><strong>Quantités:</strong> quantité, quantity, qte, qty</li>
+                            <li><strong>Montants:</strong> montant, amount, prix, price, total</li>
+                        </ul>
+                    </li>
+                    <li><i class="fas fa-check text-success me-2"></i>Le numéro de facture fixe sera utilisé pour toutes les factures générées</li>
+                    <li><i class="fas fa-check text-success me-2"></i>Les paramètres de l'entreprise peuvent être sauvegardés pour une utilisation future</li>
+                    <li><i class="fas fa-check text-success me-2"></i>Les montants seront automatiquement convertis en mots français</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Auto-fill month/year with current month if empty
+    document.addEventListener('DOMContentLoaded', function() {
+        const monthYearInput = document.getElementById('month_year');
+        if (!monthYearInput.value.trim()) {
+            const now = new Date();
+            const months = [
+                'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+                'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+            ];
+            monthYearInput.value = `${months[now.getMonth()]} ${now.getFullYear()}`;
+        }
+    });
+
+    // Form validation
+    document.querySelector('form').addEventListener('submit', function(e) {
+        const fileInput = document.getElementById('file');
+        const fixedInvoiceNumber = document.getElementById('fixed_invoice_number');
+        
+        if (!fileInput.files.length) {
+            e.preventDefault();
+            alert('Veuillez sélectionner un fichier Excel.');
+            return false;
+        }
+        
+        if (!fixedInvoiceNumber.value.trim()) {
+            e.preventDefault();
+            alert('Veuillez entrer un numéro de facture fixe.');
+            return false;
+        }
+    });
+</script>
+{% endblock %}

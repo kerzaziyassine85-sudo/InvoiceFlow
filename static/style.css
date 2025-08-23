@@ -1,0 +1,90 @@
+/* Custom styles for the invoice generator */
+body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.container {
+    flex: 1;
+}
+
+.card {
+    border: none;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+.card-header {
+    background-color: var(--bs-dark);
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+.text-primary {
+    color: var(--bs-info) !important;
+}
+
+.btn-primary {
+    background-color: var(--bs-info);
+    border-color: var(--bs-info);
+}
+
+.btn-primary:hover {
+    background-color: var(--bs-info);
+    border-color: var(--bs-info);
+    opacity: 0.9;
+}
+
+.form-label {
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--bs-info);
+    box-shadow: 0 0 0 0.25rem rgba(var(--bs-info-rgb), 0.25);
+}
+
+.alert {
+    border: none;
+    border-radius: 0.375rem;
+}
+
+footer {
+    margin-top: auto;
+}
+
+/* File upload styling */
+.form-control[type="file"] {
+    padding: 0.375rem 0.75rem;
+}
+
+/* Responsive improvements */
+@media (max-width: 768px) {
+    .container {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+    
+    .card-body {
+        padding: 1rem;
+    }
+}
+
+/* Loading state for form submission */
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Icon spacing */
+.fas, .far {
+    margin-right: 0.25rem;
+}
+
+/* Form section spacing */
+.mb-4 h5 {
+    border-bottom: 1px solid var(--bs-border-color);
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+}
