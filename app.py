@@ -178,24 +178,30 @@ def generer_factures_pdf(fichier_excel, factures_par_page=1, fixed_invoice_numbe
         # Read file based on extension with proper encoding handling
         file_ext = fichier_excel.lower().split('.')[-1]
         if file_ext == 'csv':
-            # Try different encodings for CSV files
+            # Try different encodings and separators for CSV files
             encodings_to_try = ['utf-8', 'latin-1', 'windows-1252', 'iso-8859-1']
+            separators_to_try = [',', ';', '\t']
             df = None
             last_error = None
             
             for encoding in encodings_to_try:
-                try:
-                    df = pd.read_csv(fichier_excel, encoding=encoding)
-                    app.logger.info(f"Successfully read CSV file with encoding: {encoding}")
+                for separator in separators_to_try:
+                    try:
+                        df = pd.read_csv(fichier_excel, encoding=encoding, sep=separator)
+                        app.logger.info(f"Successfully read CSV file with encoding: {encoding} and separator: '{separator}'")
+                        # Check if we have enough columns
+                        if len(df.columns) > 50:  # Should have many columns for BF to exist
+                            break
+                    except UnicodeDecodeError as e:
+                        last_error = e
+                        app.logger.debug(f"Failed to read with encoding {encoding}, sep '{separator}': {e}")
+                        continue
+                    except Exception as e:
+                        last_error = e
+                        app.logger.debug(f"Error reading with encoding {encoding}, sep '{separator}': {e}")
+                        continue
+                if df is not None and len(df.columns) > 50:
                     break
-                except UnicodeDecodeError as e:
-                    last_error = e
-                    app.logger.debug(f"Failed to read with encoding {encoding}: {e}")
-                    continue
-                except Exception as e:
-                    last_error = e
-                    app.logger.debug(f"Error reading with encoding {encoding}: {e}")
-                    continue
             
             if df is None:
                 raise ValueError(f"Impossible de lire le fichier CSV. Erreur d'encodage: {last_error}")
@@ -207,66 +213,57 @@ def generer_factures_pdf(fichier_excel, factures_par_page=1, fixed_invoice_numbe
         if df.empty:
             raise ValueError("Le fichier est vide ou ne contient pas de données valides.")
         
-        # Use specific column references as requested
-        # First name, last name from column "h" (index 7)
-        # Address from column "j" (index 9) 
-        # Breeder card number from column "m" (index 12)
-        # Quantity from column "bf" (index 57)
+        # Read specific cells from row 3: h3, j3, m3, bf3
+        # Row 3 means index 2 (0-based)
+        target_row_index = 2
+        
+        # Check if we have at least 3 rows (index 0, 1, 2)
+        if len(df) <= target_row_index:
+            raise ValueError(f"Le fichier n'a que {len(df)} lignes. La ligne 3 est requise.")
         
         try:
             # Column indices (Excel columns start from A=0, B=1, etc.)
-            name_col_index = 7   # Column H
-            address_col_index = 9  # Column J
-            breeder_card_col_index = 12  # Column M
-            quantity_col_index = 57  # Column BF (B=1, F=5, so BF = 26+5 = 31... let me recalculate)
-            
-            # BF calculation: B=1*26 + F=5 = 26+5 = 31, but in 0-based indexing it's 57
-            # Let me use column names directly for BF
+            name_col_index = 7   # Column H (h3)
+            address_col_index = 9  # Column J (j3)
+            breeder_card_col_index = 12  # Column M (m3)
+            quantity_col_index = 57  # Column BF (bf3) - BF = B(1)*26 + F(5) = 57 in 0-based
             
             # Validate that we have enough columns
-            if len(df.columns) <= max(name_col_index, address_col_index, breeder_card_col_index):
-                available_cols = ', '.join(df.columns)
-                raise ValueError(f"Le fichier n'a pas assez de colonnes. Colonnes requises: H, J, M, BF. Colonnes disponibles: {available_cols}")
+            if len(df.columns) <= max(name_col_index, address_col_index, breeder_card_col_index, quantity_col_index):
+                raise ValueError(f"Le fichier n'a que {len(df.columns)} colonnes. Les colonnes H(8), J(10), M(13), BF(58) sont requises.")
             
-            # Get column names or use positional access
-            if len(df.columns) > quantity_col_index:
-                name_col = df.columns[name_col_index]
-                address_col = df.columns[address_col_index] 
-                breeder_card_col = df.columns[breeder_card_col_index]
-                quantity_col = df.columns[quantity_col_index]
-            else:
-                # Try to find BF column by name if positional doesn't work
-                bf_found = False
-                for col in df.columns:
-                    if str(col).upper() == 'BF':
-                        quantity_col = col
-                        bf_found = True
-                        break
-                
-                if not bf_found:
-                    raise ValueError("Colonne BF non trouvée. Vérifiez que le fichier contient bien la colonne BF.")
-                
-                name_col = df.columns[name_col_index]
-                address_col = df.columns[address_col_index]
-                breeder_card_col = df.columns[breeder_card_col_index]
-                
-        except (IndexError, KeyError) as e:
-            available_cols = ', '.join(df.columns)
-            raise ValueError(f"Erreur d'accès aux colonnes requises (H, J, M, BF). Colonnes disponibles: {available_cols}. Erreur: {str(e)}")
-        
-        # Validate required data exists
-        missing_data = []
-        if name_col not in df.columns or df[name_col].isna().all():
-            missing_data.append('Noms (colonne H)')
-        if address_col not in df.columns or df[address_col].isna().all():
-            missing_data.append('Adresses (colonne J)') 
-        if breeder_card_col not in df.columns or df[breeder_card_col].isna().all():
-            missing_data.append('Numéros de carte éleveur (colonne M)')
-        if quantity_col not in df.columns or df[quantity_col].isna().all():
-            missing_data.append('Quantités (colonne BF)')
+            # Extract specific values from row 3 (index 2)
+            target_row = df.iloc[target_row_index]
             
-        if missing_data:
-            raise ValueError(f"Données manquantes: {', '.join(missing_data)}")
+            client_name = safe_text_for_pdf(target_row.iloc[name_col_index])
+            client_address = safe_text_for_pdf(target_row.iloc[address_col_index])
+            breeder_card = safe_text_for_pdf(target_row.iloc[breeder_card_col_index])
+            quantity = target_row.iloc[quantity_col_index]
+            
+            # Convert quantity to numeric, default to 1 if invalid
+            try:
+                quantity = float(quantity) if pd.notna(quantity) else 1.0
+            except (ValueError, TypeError):
+                quantity = 1.0
+                
+            app.logger.info(f"Données extraites de la ligne 3: Nom='{client_name}', Adresse='{client_address}', Carte='{breeder_card}', Quantité={quantity}")
+            
+            # Create a single-row dataframe with the extracted data for PDF generation
+            df = pd.DataFrame({
+                'nom': [client_name],
+                'adresse': [client_address], 
+                'carte_eleveur': [breeder_card],
+                'quantite': [quantity]
+            })
+            
+            # Update column references for PDF generation
+            name_col = 'nom'
+            address_col = 'adresse'
+            breeder_card_col = 'carte_eleveur'
+            quantity_col = 'quantite'
+            
+        except Exception as e:
+            raise ValueError(f"Erreur lors de l'extraction des cellules h3, j3, m3, bf3: {e}")
         
         # Use provided date or today's date
         if invoice_date:
