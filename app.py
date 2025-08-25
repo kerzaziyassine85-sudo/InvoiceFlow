@@ -34,7 +34,7 @@ db.init_app(app)
 
 # Configuration
 UPLOAD_FOLDER = tempfile.gettempdir()
-ALLOWED_EXTENSIONS = {'xlsx', 'xls'}
+ALLOWED_EXTENSIONS = {'xlsx', 'xls', 'csv', 'ods', 'xlsm', 'xlsb'}
 MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max file size
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -145,34 +145,77 @@ def generer_factures_pdf(fichier_excel, factures_par_page=1, fixed_invoice_numbe
     Returns the path to the generated PDF file.
     """
     try:
-        # Read Excel file
-        df = pd.read_excel(fichier_excel)
-        
-        # Find column mappings with flexible matching
-        name_variations = ['nom', 'nom prenom', 'client', 'name']
-        quantity_variations = ['quantité', 'quantity', 'qte', 'qty']
-        amount_variations = ['montant', 'amount', 'prix', 'price', 'total']
-        
-        name_col = find_column(df.columns, name_variations)
-        quantity_col = find_column(df.columns, quantity_variations)
-        amount_col = find_column(df.columns, amount_variations)
-        
-        # Validate required columns
-        missing_columns = []
-        if not name_col:
-            missing_columns.append('Nom (ou nom prenom, client)')
-        if not quantity_col:
-            missing_columns.append('Quantité (ou quantity, qte)')
-        if not amount_col:
-            missing_columns.append('Montant (ou amount, prix)')
-        
-        if missing_columns:
-            available_cols = ', '.join(df.columns)
-            raise ValueError(f"Colonnes manquantes dans le fichier Excel: {', '.join(missing_columns)}. Colonnes disponibles: {available_cols}")
+        # Read file based on extension
+        file_ext = fichier_excel.lower().split('.')[-1]
+        if file_ext == 'csv':
+            df = pd.read_csv(fichier_excel)
+        else:
+            df = pd.read_excel(fichier_excel)
         
         # Check if dataframe is empty
         if df.empty:
-            raise ValueError("Le fichier Excel est vide ou ne contient pas de données valides.")
+            raise ValueError("Le fichier est vide ou ne contient pas de données valides.")
+        
+        # Use specific column references as requested
+        # First name, last name from column "h" (index 7)
+        # Address from column "j" (index 9) 
+        # Breeder card number from column "m" (index 12)
+        # Quantity from column "bf" (index 57)
+        
+        try:
+            # Column indices (Excel columns start from A=0, B=1, etc.)
+            name_col_index = 7   # Column H
+            address_col_index = 9  # Column J
+            breeder_card_col_index = 12  # Column M
+            quantity_col_index = 57  # Column BF (B=1, F=5, so BF = 26+5 = 31... let me recalculate)
+            
+            # BF calculation: B=1*26 + F=5 = 26+5 = 31, but in 0-based indexing it's 57
+            # Let me use column names directly for BF
+            
+            # Validate that we have enough columns
+            if len(df.columns) <= max(name_col_index, address_col_index, breeder_card_col_index):
+                available_cols = ', '.join(df.columns)
+                raise ValueError(f"Le fichier n'a pas assez de colonnes. Colonnes requises: H, J, M, BF. Colonnes disponibles: {available_cols}")
+            
+            # Get column names or use positional access
+            if len(df.columns) > quantity_col_index:
+                name_col = df.columns[name_col_index]
+                address_col = df.columns[address_col_index] 
+                breeder_card_col = df.columns[breeder_card_col_index]
+                quantity_col = df.columns[quantity_col_index]
+            else:
+                # Try to find BF column by name if positional doesn't work
+                bf_found = False
+                for col in df.columns:
+                    if str(col).upper() == 'BF':
+                        quantity_col = col
+                        bf_found = True
+                        break
+                
+                if not bf_found:
+                    raise ValueError("Colonne BF non trouvée. Vérifiez que le fichier contient bien la colonne BF.")
+                
+                name_col = df.columns[name_col_index]
+                address_col = df.columns[address_col_index]
+                breeder_card_col = df.columns[breeder_card_col_index]
+                
+        except (IndexError, KeyError) as e:
+            available_cols = ', '.join(df.columns)
+            raise ValueError(f"Erreur d'accès aux colonnes requises (H, J, M, BF). Colonnes disponibles: {available_cols}. Erreur: {str(e)}")
+        
+        # Validate required data exists
+        missing_data = []
+        if name_col not in df.columns or df[name_col].isna().all():
+            missing_data.append('Noms (colonne H)')
+        if address_col not in df.columns or df[address_col].isna().all():
+            missing_data.append('Adresses (colonne J)') 
+        if breeder_card_col not in df.columns or df[breeder_card_col].isna().all():
+            missing_data.append('Numéros de carte éleveur (colonne M)')
+        if quantity_col not in df.columns or df[quantity_col].isna().all():
+            missing_data.append('Quantités (colonne BF)')
+            
+        if missing_data:
+            raise ValueError(f"Données manquantes: {', '.join(missing_data)}")
         
         # Use provided date or today's date
         if invoice_date:
@@ -219,16 +262,24 @@ def generer_factures_pdf(fichier_excel, factures_par_page=1, fixed_invoice_numbe
             # Draw invoice frame
             c.rect(pos_x+margin, pos_y+margin, largeur_facture-2*margin, hauteur_facture-2*margin)
             
-            # Client header (top line)
+            # Client header with name and address
             y_pos = pos_y + hauteur_facture - 20
             c.setFont("Helvetica", header_font_size)
             if factures_par_page == 4:
                 # Shorter text for compact layout
-                c.drawString(pos_x+margin+5, y_pos, f"NOM: {row[name_col].upper()[:15]}...")
+                c.drawString(pos_x+margin+5, y_pos, f"NOM: {str(row[name_col]).upper()[:15]}...")
                 y_pos -= line_spacing
-                c.drawString(pos_x+margin+5, y_pos, f"PROFESSION: {client_profession[:15]}")
+                c.drawString(pos_x+margin+5, y_pos, f"ADRESSE: {str(row[address_col])[:20]}...")
+                y_pos -= line_spacing
+                c.drawString(pos_x+margin+5, y_pos, f"CARTE: {str(row[breeder_card_col])[:15]}")
             else:
-                c.drawString(pos_x+20, y_pos, f"NOM ET PRENOM:                 {row[name_col].upper()}                   PROFESSION: {client_profession}")
+                c.drawString(pos_x+20, y_pos, f"NOM ET PRENOM: {str(row[name_col]).upper()}")
+                y_pos -= line_spacing
+                c.drawString(pos_x+20, y_pos, f"ADRESSE: {str(row[address_col])}")
+                y_pos -= line_spacing
+                c.drawString(pos_x+20, y_pos, f"CARTE ELEVEUR: {str(row[breeder_card_col])}")
+                y_pos -= line_spacing
+                c.drawString(pos_x+20, y_pos, f"PROFESSION: {client_profession}")
             
             # Invoice number and month (centered)
             y_pos -= section_spacing

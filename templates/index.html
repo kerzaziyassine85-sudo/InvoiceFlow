@@ -21,10 +21,10 @@
                             Fichier Excel
                         </h5>
                         <div class="mb-3">
-                            <label for="file" class="form-label">Sélectionner le fichier Excel (.xlsx ou .xls)</label>
-                            <input type="file" class="form-control" name="file" id="file" accept=".xlsx,.xls" required>
+                            <label for="file" class="form-label">Sélectionner le fichier Excel/CSV (.xlsx, .xls, .csv, etc.)</label>
+                            <input type="file" class="form-control" name="file" id="file" accept=".xlsx,.xls,.csv,.ods,.xlsm,.xlsb" required>
                             <div class="form-text">
-                                Le fichier doit contenir les colonnes: Nom/Client, Quantité, Montant
+                                Le fichier doit contenir les données dans les colonnes spécifiques: H (Nom), J (Adresse), M (Carte éleveur), BF (Quantité)
                             </div>
                         </div>
                     </div>
@@ -174,14 +174,16 @@
             </div>
             <div class="card-body">
                 <ul class="list-unstyled">
-                    <li><i class="fas fa-check text-success me-2"></i>Le fichier Excel doit contenir des colonnes pour les noms des clients, les quantités et les montants</li>
-                    <li><i class="fas fa-check text-success me-2"></i>Les noms de colonnes acceptés: 
+                    <li><i class="fas fa-check text-success me-2"></i>Formats de fichiers acceptés: Excel (.xlsx, .xls, .xlsm, .xlsb), CSV (.csv), OpenDocument (.ods)</li>
+                    <li><i class="fas fa-check text-success me-2"></i>Structure des données requise: 
                         <ul class="mt-2">
-                            <li><strong>Noms:</strong> nom, nom prenom, client, name</li>
-                            <li><strong>Quantités:</strong> quantité, quantity, qte, qty</li>
-                            <li><strong>Montants:</strong> montant, amount, prix, price, total</li>
+                            <li><strong>Colonne H:</strong> Nom et prénom du client</li>
+                            <li><strong>Colonne J:</strong> Adresse du client</li>
+                            <li><strong>Colonne M:</strong> Numéro de carte éleveur</li>
+                            <li><strong>Colonne BF:</strong> Quantité</li>
                         </ul>
                     </li>
+                    <li><i class="fas fa-check text-success me-2"></i>Le calcul du montant se fait automatiquement: Quantité × Prix unitaire</li>
                     <li><i class="fas fa-check text-success me-2"></i>Le numéro de facture fixe sera utilisé pour toutes les factures générées</li>
                     <li><i class="fas fa-check text-success me-2"></i>Les paramètres de l'entreprise peuvent être sauvegardés pour une utilisation future</li>
                     <li><i class="fas fa-check text-success me-2"></i>Les montants seront automatiquement convertis en mots français</li>
@@ -214,7 +216,7 @@
         
         if (!fileInput.files.length) {
             e.preventDefault();
-            alert('Veuillez sélectionner un fichier Excel.');
+            alert('Veuillez sélectionner un fichier (Excel, CSV, etc.).');
             return false;
         }
         
