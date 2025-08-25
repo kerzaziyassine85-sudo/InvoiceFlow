@@ -139,17 +139,68 @@ def find_column(df_columns, possible_names):
                 return df_columns[i]
     return None
 
+def safe_text_for_pdf(value, max_length=None):
+    """Safely convert value to string for PDF display, handling NaN and special characters."""
+    if pd.isna(value) or value is None:
+        return ""
+    
+    try:
+        # Convert to string and replace problematic characters
+        text = str(value).strip()
+        # Replace common problematic characters
+        text = text.replace('é', 'e').replace('è', 'e').replace('ê', 'e').replace('ë', 'e')
+        text = text.replace('à', 'a').replace('â', 'a').replace('ä', 'a')
+        text = text.replace('ù', 'u').replace('û', 'u').replace('ü', 'u')
+        text = text.replace('ô', 'o').replace('ö', 'o')
+        text = text.replace('î', 'i').replace('ï', 'i')
+        text = text.replace('ç', 'c')
+        text = text.replace('É', 'E').replace('È', 'E').replace('Ê', 'E').replace('Ë', 'E')
+        text = text.replace('À', 'A').replace('Â', 'A').replace('Ä', 'A')
+        text = text.replace('Ù', 'U').replace('Û', 'U').replace('Ü', 'U')
+        text = text.replace('Ô', 'O').replace('Ö', 'O')
+        text = text.replace('Î', 'I').replace('Ï', 'I')
+        text = text.replace('Ç', 'C')
+        
+        if max_length and len(text) > max_length:
+            text = text[:max_length] + "..."
+            
+        return text
+    except Exception as e:
+        app.logger.warning(f"Error converting text for PDF: {e}")
+        return str(value)[:max_length] if max_length else str(value)
+
 def generer_factures_pdf(fichier_excel, factures_par_page=1, fixed_invoice_number="FAC-001", invoice_date=None, company_name="", address="", rc_name="", nif="", item_name="", client_profession="", month_year="", rib="", unit_price=0.0):
     """
     Generate PDF invoices from Excel data with fixed invoice number.
     Returns the path to the generated PDF file.
     """
     try:
-        # Read file based on extension
+        # Read file based on extension with proper encoding handling
         file_ext = fichier_excel.lower().split('.')[-1]
         if file_ext == 'csv':
-            df = pd.read_csv(fichier_excel)
+            # Try different encodings for CSV files
+            encodings_to_try = ['utf-8', 'latin-1', 'windows-1252', 'iso-8859-1']
+            df = None
+            last_error = None
+            
+            for encoding in encodings_to_try:
+                try:
+                    df = pd.read_csv(fichier_excel, encoding=encoding)
+                    app.logger.info(f"Successfully read CSV file with encoding: {encoding}")
+                    break
+                except UnicodeDecodeError as e:
+                    last_error = e
+                    app.logger.debug(f"Failed to read with encoding {encoding}: {e}")
+                    continue
+                except Exception as e:
+                    last_error = e
+                    app.logger.debug(f"Error reading with encoding {encoding}: {e}")
+                    continue
+            
+            if df is None:
+                raise ValueError(f"Impossible de lire le fichier CSV. Erreur d'encodage: {last_error}")
         else:
+            # For Excel files, pandas handles encoding automatically
             df = pd.read_excel(fichier_excel)
         
         # Check if dataframe is empty
@@ -267,19 +318,19 @@ def generer_factures_pdf(fichier_excel, factures_par_page=1, fixed_invoice_numbe
             c.setFont("Helvetica", header_font_size)
             if factures_par_page == 4:
                 # Shorter text for compact layout
-                c.drawString(pos_x+margin+5, y_pos, f"NOM: {str(row[name_col]).upper()[:15]}...")
+                c.drawString(pos_x+margin+5, y_pos, f"NOM: {safe_text_for_pdf(row[name_col], 15).upper()}")
                 y_pos -= line_spacing
-                c.drawString(pos_x+margin+5, y_pos, f"ADRESSE: {str(row[address_col])[:20]}...")
+                c.drawString(pos_x+margin+5, y_pos, f"ADRESSE: {safe_text_for_pdf(row[address_col], 20)}")
                 y_pos -= line_spacing
-                c.drawString(pos_x+margin+5, y_pos, f"CARTE: {str(row[breeder_card_col])[:15]}")
+                c.drawString(pos_x+margin+5, y_pos, f"CARTE: {safe_text_for_pdf(row[breeder_card_col], 15)}")
             else:
-                c.drawString(pos_x+20, y_pos, f"NOM ET PRENOM: {str(row[name_col]).upper()}")
+                c.drawString(pos_x+20, y_pos, f"NOM ET PRENOM: {safe_text_for_pdf(row[name_col]).upper()}")
                 y_pos -= line_spacing
-                c.drawString(pos_x+20, y_pos, f"ADRESSE: {str(row[address_col])}")
+                c.drawString(pos_x+20, y_pos, f"ADRESSE: {safe_text_for_pdf(row[address_col])}")
                 y_pos -= line_spacing
-                c.drawString(pos_x+20, y_pos, f"CARTE ELEVEUR: {str(row[breeder_card_col])}")
+                c.drawString(pos_x+20, y_pos, f"CARTE ELEVEUR: {safe_text_for_pdf(row[breeder_card_col])}")
                 y_pos -= line_spacing
-                c.drawString(pos_x+20, y_pos, f"PROFESSION: {client_profession}")
+                c.drawString(pos_x+20, y_pos, f"PROFESSION: {safe_text_for_pdf(client_profession)}")
             
             # Invoice number and month (centered)
             y_pos -= section_spacing
