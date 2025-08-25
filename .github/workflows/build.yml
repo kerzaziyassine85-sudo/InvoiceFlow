@@ -31,3 +31,10 @@ jobs:
         with:
           name: InvoiceFlow
           path: dist/main.exe
+
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: InvoiceFlow
+          path: dist/main.exe
