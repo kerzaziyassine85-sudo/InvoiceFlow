@@ -213,48 +213,60 @@ def generer_factures_pdf(fichier_excel, factures_par_page=1, fixed_invoice_numbe
         if df.empty:
             raise ValueError("Le fichier est vide ou ne contient pas de données valides.")
         
-        # Read specific cells from row 3: h3, j3, m3, bf3
+        # Read data from columns H, J, M, BF starting from row 3 until the last row
         # Row 3 means index 2 (0-based)
-        target_row_index = 2
+        start_row_index = 2
         
         # Check if we have at least 3 rows (index 0, 1, 2)
-        if len(df) <= target_row_index:
-            raise ValueError(f"Le fichier n'a que {len(df)} lignes. La ligne 3 est requise.")
+        if len(df) <= start_row_index:
+            raise ValueError(f"Le fichier n'a que {len(df)} lignes. Au moins 3 lignes sont requises.")
         
         try:
             # Column indices (Excel columns start from A=0, B=1, etc.)
-            name_col_index = 7   # Column H (h3)
-            address_col_index = 9  # Column J (j3)
-            breeder_card_col_index = 12  # Column M (m3)
-            quantity_col_index = 57  # Column BF (bf3) - BF = B(1)*26 + F(5) = 57 in 0-based
+            name_col_index = 7   # Column H
+            address_col_index = 9  # Column J
+            breeder_card_col_index = 12  # Column M
+            quantity_col_index = 57  # Column BF - BF = B(1)*26 + F(5) = 57 in 0-based
             
             # Validate that we have enough columns
             if len(df.columns) <= max(name_col_index, address_col_index, breeder_card_col_index, quantity_col_index):
                 raise ValueError(f"Le fichier n'a que {len(df.columns)} colonnes. Les colonnes H(8), J(10), M(13), BF(58) sont requises.")
             
-            # Extract specific values from row 3 (index 2)
-            target_row = df.iloc[target_row_index]
+            # Extract data from all rows starting from row 3
+            clients_data = []
             
-            client_name = safe_text_for_pdf(target_row.iloc[name_col_index])
-            client_address = safe_text_for_pdf(target_row.iloc[address_col_index])
-            breeder_card = safe_text_for_pdf(target_row.iloc[breeder_card_col_index])
-            quantity = target_row.iloc[quantity_col_index]
-            
-            # Convert quantity to numeric, default to 1 if invalid
-            try:
-                quantity = float(quantity) if pd.notna(quantity) else 1.0
-            except (ValueError, TypeError):
-                quantity = 1.0
+            for row_idx in range(start_row_index, len(df)):
+                row = df.iloc[row_idx]
                 
-            app.logger.info(f"Données extraites de la ligne 3: Nom='{client_name}', Adresse='{client_address}', Carte='{breeder_card}', Quantité={quantity}")
+                client_name = safe_text_for_pdf(row.iloc[name_col_index])
+                client_address = safe_text_for_pdf(row.iloc[address_col_index])
+                breeder_card = safe_text_for_pdf(row.iloc[breeder_card_col_index])
+                quantity = row.iloc[quantity_col_index]
+                
+                # Convert quantity to numeric, default to 1 if invalid
+                try:
+                    quantity = float(quantity) if pd.notna(quantity) else 1.0
+                except (ValueError, TypeError):
+                    quantity = 1.0
+                
+                # Skip rows with empty names
+                if not client_name or client_name.strip() == "":
+                    continue
+                    
+                clients_data.append({
+                    'nom': client_name,
+                    'adresse': client_address,
+                    'carte_eleveur': breeder_card,
+                    'quantite': quantity
+                })
+                
+                app.logger.info(f"Ligne {row_idx + 1}: Nom='{client_name}', Adresse='{client_address}', Carte='{breeder_card}', Quantité={quantity}")
             
-            # Create a single-row dataframe with the extracted data for PDF generation
-            df = pd.DataFrame({
-                'nom': [client_name],
-                'adresse': [client_address], 
-                'carte_eleveur': [breeder_card],
-                'quantite': [quantity]
-            })
+            if not clients_data:
+                raise ValueError("Aucune donnée valide trouvée à partir de la ligne 3.")
+            
+            # Create a new dataframe with all the extracted data
+            df = pd.DataFrame(clients_data)
             
             # Update column references for PDF generation
             name_col = 'nom'
@@ -262,8 +274,10 @@ def generer_factures_pdf(fichier_excel, factures_par_page=1, fixed_invoice_numbe
             breeder_card_col = 'carte_eleveur'
             quantity_col = 'quantite'
             
+            app.logger.info(f"Total de {len(df)} clients trouvés pour générer les factures.")
+            
         except Exception as e:
-            raise ValueError(f"Erreur lors de l'extraction des cellules h3, j3, m3, bf3: {e}")
+            raise ValueError(f"Erreur lors de l'extraction des données des colonnes H, J, M, BF: {e}")
         
         # Use provided date or today's date
         if invoice_date:
